@@ -125,7 +125,7 @@ if [[ "x$CGPVCF" == "x" ]] ; then
   exit 1;
 fi
 
-echo -n "Compiling pindel binaries ..."
+echo -n "Compiling pindel (legacy) binaries ..."
 cd $INIT_DIR
 g++ -O3 -o $SETUP_DIR/pindel c++/pindel.cpp &&
 g++ -O3 -o $SETUP_DIR/filter_pindel_reads c++/filter_pindel_reads.cpp &&
@@ -136,6 +136,18 @@ mkdir -p $INIT_DIR/bin &&
 cp $SETUP_DIR/pindel $INIT_DIR/bin/. &&
 cp $SETUP_DIR/filter_pindel_reads $INIT_DIR/bin/.
 done_message "" "Failed during compilation of pindel."
+
+echo "Compiling 'official' pindel"
+cd $SETUP_DIR
+get_file pindel_official.tar.gz https://github.com/genome/pindel/archive/b706fba61c64a11fb1d3716d501fd2f4d8992e29.tar.gz
+mkdir -p pindel_official
+tar -C pindel_official --strip-components 1 -zxf pindel_official.tar.gz
+cd pindel_official
+./INSTALL $INST_PATH
+cp pindel $INST_PATH/bin/pindel_official
+cd $INIT_DIR
+rm -rf pindel_official pindel_official.tar.gz
+
 
 cd $INIT_DIR/perl
 

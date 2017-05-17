@@ -44,6 +44,8 @@ use Sanger::CGP::Pindel::OutputGen::BamUtil;
 
 const my $PINDEL_GEN_COMM => q{ -b %s -o %s -t %s};
 const my $SAMTOOLS_FAIDX => q{ faidx %s %s > %s};
+const my $FILTER_FROM_GZ => q{gunzip -c %s | %s %s %s %s /dev/stdin};
+const my $MODERN_PIN => q{%s -M 3 -f %s -p %s -o %s -c %s};
 const my $FIFO_FILTER_TO_PIN => q{gunzip -c %s | %s %s %s %s /dev/stdin | %s %s %s %s %s %s %s};
 const my $PIN_2_VCF => q{ -mt %s -wt %s -r %s -o %s -so %s -mtp %s -wtp %s -pp '%s' -i %s};
 const my $PIN_MERGE => q{ -o %s -i %s};
@@ -129,25 +131,45 @@ sub pindel {
     my $gen_out = File::Spec->catdir($tmp, 'pout');
     make_path($gen_out) unless(-e $gen_out);
 
-    my ($bd_fh, $bd_file) = tempfile(File::Spec->catfile($tmp, 'pindel_db_XXXX'), UNLINK => 0);
-    close $bd_fh;
-
     unlink $filtered_seq if(-e $filtered_seq);
 
-    ## FIFO madness
-    push @command_set, 'mkfifo '.$filtered_seq; # shell for this
-    push @command_set, sprintf $FIFO_FILTER_TO_PIN, (join q{ }, @{$options->{'seqs'}->{$seq}}),
-                                                _which('filter_pindel_reads'),
-                                                $refseq_file,
-                                                $seq,
-                                                $filtered_seq,
-                                                _which('pindel'),
-                                                $refseq_file,
-                                                $filtered_seq,
-                                                $gen_out,
-                                                $seq,
-                                                $bd_file,
-                                                5;
+    if($options->{'modern'}) {
+      my $fa_idx = sprintf '%s faidx %s', _which('samtools'), $refseq_file;
+      push @command_set, $fa_idx;
+      push @command_set, sprintf $FILTER_FROM_GZ,
+                                (join q{ }, @{$options->{'seqs'}->{$seq}}),
+                                 _which('filter_pindel_reads'),
+                                 $refseq_file,
+                                 $seq,
+                                 $filtered_seq;
+      ##pindel -M 3 -f 6.fa -p filtered.txt -o legacy/filtered.txt -c 6
+      push @command_set, sprintf $MODERN_PIN,
+                                 _which('pindel_official'),
+                                  $refseq_file,
+                                  $filtered_seq,
+                                  $gen_out.'/'.$seq.'_'.$seq,
+                                  $seq;
+    }
+    else {
+      ## FIFO madness
+      my ($bd_fh, $bd_file) = tempfile(File::Spec->catfile($tmp, 'pindel_db_XXXX'), UNLINK => 0);
+      close $bd_fh;
+      push @command_set, 'mkfifo '.$filtered_seq; # shell for this
+      push @command_set, sprintf $FIFO_FILTER_TO_PIN,
+                                 (join q{ }, @{$options->{'seqs'}->{$seq}}),
+                                  _which('filter_pindel_reads'),
+                                  $refseq_file,
+                                  $seq,
+                                  $filtered_seq,
+                                  _which('pindel'),
+                                  $refseq_file,
+                                  $filtered_seq,
+                                  $gen_out,
+                                  $seq,
+                                  $bd_file,
+                                  5;
+      push @command_set, 'rm -f '.$bd_file;
+    }
 
     PCAP::Threaded::external_process_handler(File::Spec->catdir($tmp, 'logs'), \@command_set, $index);
 
@@ -155,7 +177,13 @@ sub pindel {
     for my $ext((qw(BP INV LI TD))) {
       unlink File::Spec->catfile($gen_out, (join '_', $seq, $seq, $ext));
     }
-    unlink $bd_file;
+    if($options->{'modern'}) {
+        for my $ext((qw(CloseEndMapped INT_final RP))) {
+          unlink File::Spec->catfile($gen_out, (join '_', $seq, $seq, $ext));
+        }
+        unlink $refseq_file.'.fai';
+    }
+
     unlink $refseq_file;
     unlink $filtered_seq;
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 ########## LICENCE ##########
-# Copyright (c) 2014 Genome Research Ltd.
+# Copyright (c) 2014-2017 Genome Research Ltd.
 #
 # Author: Keiran Raine <cgpit@sanger.ac.uk>
 #
@@ -109,6 +109,7 @@ sub setup {
               'p|process=s' => \$opts{'process'},
               'i|index=i' => \$opts{'index'},
               'v|version' => \$opts{'version'},
+              'm|modern' => \$opts{'modern'},
               # these are specifically for pin2vcf
               'sp|species=s' => \$opts{'species'},
               'as|assembly=s' => \$opts{'assembly'},
@@ -231,6 +232,7 @@ pindel.pl [options]
                       - see pindel_np_from_vcf.pl
 
   Optional
+    -modern    -m   Use the official pindel binary instead of legacy
     -seqtype   -st  Sequencing protocol, expect all input to match [WGS]
     -assembly  -as  Name of assembly in use
                      -  when not available in BAM header SQ line.
